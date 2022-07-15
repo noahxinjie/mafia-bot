@@ -95,16 +95,6 @@ def json_to_dict(x) -> dict:
     x = x.replace('"is_bot": True', '"is_bot": "True"')
     return json.loads(x)
 
-def remove_from_list(list1, removed) -> None:
-    y = json_to_dict(str(removed))
-    removed_id = y["id"]
-    for x in list1 :
-        z = json_to_dict(x)
-        z_id = z["id"]
-        if removed_id == z_id :
-            list1.remove(x)
-            break
-
 def join(update : Update, _: CallbackContext) -> None:
     user = update.effective_user
     chat_id = update.effective_chat.id
@@ -117,8 +107,7 @@ def join(update : Update, _: CallbackContext) -> None:
         if not player_doc.exists :
             player_ref.document(str(user_id)).set(Player(user_id, chat_id, name).to_dict())
         else :
-            player = Player(0, 0, "")
-            player.from_dict(player_doc.to_dict())
+            player = Player.get_player(id=user_id, player_db=player_ref)
             if player.chat_id != chat_id :
                 player.chat_id = chat_id
                 player_ref.document(str(user_id)).set(player.to_dict())
@@ -126,8 +115,7 @@ def join(update : Update, _: CallbackContext) -> None:
         if not doc.exists :
             update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
         else :
-            chat = Chat()
-            chat.from_dict(doc.to_dict())
+            chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
             if chat.game_state == 0 :
                 update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
             elif chat.game_state == 1 :
@@ -144,9 +132,7 @@ def join(update : Update, _: CallbackContext) -> None:
                         update_msg = f'{name} has joined the game. *For first-time users, do use /start in a private message to the Mafia Moderator Bot.*\nNumber of people in game lobby now: {len(chat.players)}\nPeople in the game lobby:'
                         count = 1
                         for x in chat.alive :
-                            player = Player(0, 0, "")
-                            player_doc = player_ref.document(str(x)).get()
-                            player.from_dict(player_doc.to_dict())
+                            player = Player.get_player(id=x, player_db=player_ref)
                             update_msg += f'\n{count}. {player.name}'
                             count += 1
                         bot.send_message(chat_id=chat_id, text=update_msg, parse_mode=telegram.ParseMode.MARKDOWN)
@@ -172,9 +158,7 @@ def start(update: Update, context) -> None:
         if not doc.exists :
             chat_ref.document(str(chat_id)).set(Chat().to_dict())
             setting_ref.document(str(chat_id)).set(Settings().to_dict())
-        doc = chat_ref.document(str(chat_id)).get()
-        chat = Chat()
-        chat.from_dict(doc.to_dict())    
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref) 
         if chat.game_state == 0 :
             chat.game_state = 1
             chat_ref.document(str(chat_id)).set(chat.to_dict())
@@ -218,16 +202,11 @@ def start(update: Update, context) -> None:
                     dups1[number] = dups1[number] - 1 # updating role duplicate pool
                     chat.players[str(id)] = number 
                     chat_ref.document(str(chat_id)).set(chat.to_dict())
-                    # retrieving player instance mapped to id
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(str(id)).get()
-                    player.from_dict(doc.to_dict())
                     # creating role instance and updating player instance with it
                     instance = role_instance_dict.get(number) 
                     instance1 = copy.deepcopy(instance)
                     instance1.user_id = id
-                    player.role_instance = str(instance1)
-                    player_ref.document(str(id)).set(player.to_dict())
+                    player_ref.document(str(id)).update({'role_instance' : str(instance1)})
                     bot.send_message(id, f'Your role is {role1}.')
                 
                 if number_of_players > 7 :
@@ -283,12 +262,12 @@ def start(update: Update, context) -> None:
                 
                 # Assign remaining town players 
                 #for x in range(number_of_random_town_players): 
-                number = random.randint(6, 6)
+                number = random.randint(1, 11)
                 assign(number)
 
                 # Assign remaining mafia players            
                 #for x in range(number_of_mafia_players - 1):
-                number = random.randint(12, 12)
+                number = random.randint(12, 17)
                 assign(number)
 
                 #Sending a message of mafia list to all in mafia faction
@@ -296,9 +275,7 @@ def start(update: Update, context) -> None:
                 count = 1
                 for x in chat.mafia :
                     role_name = roles_dict.get(chat.players[str(x)])
-                    player = Player(0, 0, "")
-                    player_doc = player_ref.document(str(x)).get()
-                    player.from_dict(player_doc.to_dict())
+                    player = Player.get_player(id=x, player_db=player_ref)
                     name = player.name
                     msg += f'\n{count}. {name} Role: {role_name}'
                     count += 1                   
@@ -307,9 +284,7 @@ def start(update: Update, context) -> None:
                     bot.send_message(x, msg)
 
                 def check_game_state() -> bool :
-                    chat1 = Chat()
-                    chat_doc = chat_ref.document(str(chat_id)).get()
-                    chat1.from_dict(chat_doc.to_dict())
+                    chat1 = Chat.get_chat(id=chat_id, chat_db=chat_ref)
                     if chat1.game_state == -1 :                           
                         chat = Chat()
                         chat_ref.document(str(chat_id)).set(chat.to_dict())
@@ -337,9 +312,7 @@ def start(update: Update, context) -> None:
                         mayor_id = a[0]
                         if mayor_id in chat.alive :
                             #retrieving player instance of mayor
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(mayor_id)).get()
-                            player.from_dict(doc.to_dict())
+                            player = Player.get_player(id=mayor_id, player_db=player_ref)
                             #retrieving role instance of mayor
                             z = player.role_instance
                             dict1 = json_to_dict(z)
@@ -372,9 +345,7 @@ def start(update: Update, context) -> None:
                 for x in chat.alive :
                     role_number = chat.players[str(x)]
                     # retrieving player instance mapped to current iteration
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(str(x)).get()
-                    player.from_dict(doc.to_dict())
+                    player = Player.get_player(id=x, player_db=player_ref)
                     # retrieving role instance
                     z = player.role_instance
                     dict1 = json_to_dict(z)
@@ -426,11 +397,9 @@ def start(update: Update, context) -> None:
                             random_choice = random.choice(chat.mafia)
                             chat.players[str(random_choice)] = 13
                             chat_ref.document(str(chat_id)).set(chat.to_dict())
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(random_choice)).get()
-                            player.from_dict(doc.to_dict())
-                            player.role_instance = str(Mafioso(random_choice))
-                            player_ref.document(str(random_choice)).set(player.to_dict())
+                            mafioso_instance = str(Mafioso(random_choice))
+                            player_ref.document(str(random_choice)).update({'role_instance' : mafioso_instance})
+                            player = Player.get_player(id=random_choice, player_db=player_ref)
                             name = player.name
                             for y in chat.mafia :  
                                 if y == random_choice :
@@ -500,9 +469,7 @@ def start(update: Update, context) -> None:
                         voting_msg += "\nDo note that your vote will be voided if you vote for yourself"\
                         " or if you are not a currently alive player."
                         for x in temp_list:                            
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(x)).get()
-                            player.from_dict(doc.to_dict())
+                            player = Player.get_player(id=x, player_db=player_ref)
                             name = player.name
                             options.append(name)
                         message = bot.send_poll(
@@ -543,9 +510,7 @@ def start(update: Update, context) -> None:
                         if check_game_state() :
                             return
                         defendant_id = chat.defendant
-                        player = Player(0, 0, "")
-                        doc = player_ref.document(str(defendant_id)).get()
-                        player.from_dict(doc.to_dict())
+                        player = Player.get_player(id=defendant_id, player_db=player_ref)
                         defendant_name = player.name
                         defence_time = chat_settings.defence
                         bot.send_message(chat_id=chat_id, text=f'{defendant_name} has been voted to the stand. Defence time: {defence_time} seconds. ' +
@@ -638,9 +603,6 @@ def start(update: Update, context) -> None:
                         doc = chat_ref.document(str(chat_id)).get()
                         chat.from_dict(doc.to_dict())
                         break
-
-                    doc = chat_ref.document(str(chat_id)).get()
-                    chat.from_dict(doc.to_dict())
                     
                     if chat.deathless_phases == 6 :
                         break
@@ -659,9 +621,7 @@ def start(update: Update, context) -> None:
                         # checking if role of current iteration is mayor
                         if role_number != 1 :
                             # retrieving player instance mapped to current iteration
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(x)).get()
-                            player.from_dict(doc.to_dict())
+                            player = Player.get_player(id=x, player_db=player_ref)
                             # retrieving role instance
                             z = player.role_instance
                             dict1 = json_to_dict(z)
@@ -706,9 +666,7 @@ def start(update: Update, context) -> None:
                 role_reveal_msg = ""
                 for k, v in chat.players.items() :
                     role_name = roles_dict.get(v)
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(k).get()
-                    player.from_dict(doc.to_dict())
+                    player = Player.get_player(id=k, player_db=player_ref)
                     name = player.name
                     role_reveal_msg += f"{name}'s role was {role_name}.\n"
 
@@ -738,9 +696,7 @@ def start(update: Update, context) -> None:
 
                     elif len(chat.town) == 0 :
                         for k in chat.mafia :
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(k)).get()
-                            player.from_dict(doc.to_dict())
+                            player = Player.get_player(id=k, player_db=player_ref)
                             name = player.name
                             victory_msg += f"{number_of_winners}: {name}\n"
                             number_of_winners += 1
@@ -757,9 +713,7 @@ def start(update: Update, context) -> None:
 
                     else :
                         for k in chat.town :
-                            player = Player(0, 0, "")
-                            doc = player_ref.document(str(k)).get()
-                            player.from_dict(doc.to_dict())
+                            player = Player.get_player(id=k, player_db=player_ref)
                             name = player.name
                             victory_msg += f"{number_of_winners}: {name}\n"
                             number_of_winners += 1
@@ -783,14 +737,10 @@ def judge_callback(update:Update, _: CallbackContext) -> None :
     update.callback_query.edit_message_reply_markup(reply_markup=reply)
     choice = update.callback_query.data
     user = update.effective_user
-    doc1 = player_ref.document(str(user.id)).get()
-    player = Player(0, 0, "")
-    player.from_dict(doc1.to_dict())
+    player = Player.get_player(id=user.id, player_db=player_ref)
     chat_id = player.chat_id
     current_chat_ref = chat_ref.document(str(chat_id))
-    doc = current_chat_ref.get()
-    chat = Chat()
-    chat.from_dict(doc.to_dict())
+    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
     number = ord(choice[10]) - 48
     #if user voted innocent
     if number == 1 :
@@ -820,13 +770,9 @@ def vote_handling(update: Update, context) -> None :
     answered_poll = context.bot_data[answer.poll_id]
     selected_options = answer.option_ids
     user_id = answer.user.id
-    doc1 = player_ref.document(str(user_id)).get()
-    player = Player(0, 0, "")
-    player.from_dict(doc1.to_dict())
+    player = Player.get_player(id=user_id, player_db=player_ref)
     chat_id = player.chat_id
-    doc = chat_ref.document(str(chat_id)).get()
-    chat = Chat()
-    chat.from_dict(doc.to_dict())
+    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
     current_chat_ref = chat_ref.document(str(chat_id))
     #  only process votes by alive players
     if user_id in chat.alive :
@@ -852,17 +798,17 @@ def vote_handling(update: Update, context) -> None :
                 else :
                     current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
                 #checking if vote threshold has been breached
-                doc = chat_ref.document(str(chat_id)).get()
-                chat.from_dict(doc.to_dict())
+                chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
                 vote_list = []
                 for x in chat.voting.keys() :
                     if chat.voting[x] != -1 :
                         if chat.players[x] == 1 :
-                            doc2 = player_ref.document(x).get()
-                            player1 = Player(0, 0, "")
-                            player1.from_dict(doc2.to_dict())
+                            a = [int(s) for s in x.split() if s.isdigit()]
+                            player1 = Player.get_player(id=a[0], player_db=player_ref)
                             if player1.last_vote_count == 3 :
                                 vote_list += 3 * [chat.voting[x]]
+                            else :
+                                vote_list.append(chat.voting[x])
                         else :
                             vote_list.append(chat.voting[x])
                 mode = statistics.mode(vote_list)
@@ -875,13 +821,9 @@ def vote_handling(update: Update, context) -> None :
 def ability_callback(update: Update, _: CallbackContext) -> None :
     choice = update.callback_query.data
     user = update.effective_user
-    doc1 = player_ref.document(str(user.id)).get()
-    player = Player(0, 0, "")
-    player.from_dict(doc1.to_dict())
+    player = Player.get_player(id=user.id, player_db=player_ref)
     chat_id = player.chat_id
-    doc = chat_ref.document(str(chat_id)).get()
-    chat = Chat()
-    chat.from_dict(doc.to_dict())
+    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
     current_chat_ref = chat_ref.document(str(chat_id))
     target = choice[8:]
     a = [int(s) for s in target.split() if s.isdigit()]
@@ -938,15 +880,15 @@ def do_nothing(update: Update, _: CallbackContext) -> None :
 
 def stats(update: Update, _: CallbackContext) -> None :
     user_id = update.effective_user.id
-    player = Player(0, 0, "")
     player_doc = player_ref.document(str(user_id)).get()
     if not player_doc.exists :
         update.message.reply_text(text="You haven't played any games yet! Play one to start seeing your player stats.")
-    player.from_dict(player_doc.to_dict())
-    msg = player.show_stats()
-    msg += " \n"
-    msg += "Use /global_stats to view stats of games across all chat groups."
-    update.message.reply_text(text=msg)
+    else :
+        player = Player.get_player(id=user_id, player_db=player_ref)
+        msg = player.show_stats()
+        msg += " \n"
+        msg += "Use /global_stats to view stats of games across all chat groups."
+        update.message.reply_text(text=msg)
 
 def global_stats(update: Update, _: CallbackContext) -> None :
     chat_id = update.effective_chat.id
@@ -1074,9 +1016,7 @@ def change_settings(chat_id: int, user_id: int, msg: str, phase: str) -> None:
         if len(a.split()) == 1 and a.split()[0].isdigit() :
             b = [int(s) for s in a.split() if s.isdigit()]
             new_duration = b[0]
-            chat = Chat()
-            chat_doc = chat_ref.document(str(chat_id)).get()
-            chat.from_dict(chat_doc.to_dict())
+            chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
             if chat_id == user_id :
                 bot.send_message(chat_id=chat_id, text='Invalid command. Please edit the game settings in a group chat.')
             else :
@@ -1146,8 +1086,7 @@ def stop(update: Update, _: CallbackContext) -> None:
     elif not doc.exists :
         update.message.reply_text("There is no ongoing game right now!")
     else :
-        chat = Chat()
-        chat.from_dict(doc.to_dict())
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
         if chat.game_state == 0 or chat.game_state == 1 :
                 update.message.reply_text("There is no ongoing game right now!")
         else :
@@ -1171,17 +1110,14 @@ def alive(update: Update, _: CallbackContext) -> None:
     elif not doc.exists :
         update.message.reply_text('There is no ongoing game now.')
     else :
-        chat = Chat()
-        chat.from_dict(doc.to_dict())
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
         if chat.game_state == 0 or chat.game_state == 1 :
             update.message.reply_text('There is no ongoing game now.')
         else :
             count = 1
             msg = 'People who are still alive are:'
             for x in chat.alive :
-                player = Player(0, 0, "")
-                doc = player_ref.document(str(x)).get()
-                player.from_dict(doc.to_dict())
+                player = Player.get_player(id=x, player_db=player_ref)
                 name = player.name
                 msg += f'\n{count}. {name}'
                 count += 1
@@ -1196,8 +1132,7 @@ def graveyard(update: Update, _: CallbackContext) -> None:
     elif not doc.exists :
         update.message.reply_text('There is no ongoing game now.')
     else :
-        chat = Chat()
-        chat.from_dict(doc.to_dict())
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
         if chat.game_state == 0 or chat.game_state == 1:
             update.message.reply_text('There is no ongoing game now.')
         else :
@@ -1207,9 +1142,7 @@ def graveyard(update: Update, _: CallbackContext) -> None:
                 count = 1
                 msg = 'People in the graveyard are:'
                 for x in chat.graveyard :
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(str(x)).get()
-                    player.from_dict(doc.to_dict())
+                    player = Player.get_player(id=x, player_db=player_ref)
                     name = player.name
                     role = roles_dict.get(chat.players[str(x)])
                     msg += f'\n{count}. {name} Role: {role}'

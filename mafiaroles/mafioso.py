@@ -37,7 +37,7 @@ class Mafioso(Mafia):
                     "godfather's target for the godfather instead."
     
     
-    # kill target
+    # Kill someone
     def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
         temp_alive = copy.deepcopy(alive_list)
         temp_town = copy.deepcopy(town_list)
@@ -45,9 +45,7 @@ class Mafioso(Mafia):
         count = 0
         for x in temp_alive :
             if x in temp_town :
-                player = Player(0, 0, "")
-                doc = player_ref.document(str(x)).get()
-                player.from_dict(doc.to_dict())
+                player = Player.get_player(id=x, player_db=player_ref)
                 name = player.name
                 options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
                 count += 1

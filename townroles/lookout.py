@@ -34,14 +34,12 @@ class Lookout(Town):
             "during the night to watch someone to obtain information of the people who visited their target."
     
     
-    # Prevent someone from using role
+    # Watch someone to see who visited him at night
     def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
         temp_alive = copy.deepcopy(alive_list)
         options = []
         for x in temp_alive :
-            player = Player(0, 0, "")
-            doc = player_ref.document(str(x)).get()
-            player.from_dict(doc.to_dict())
+            player = Player.get_player(id=x, player_db=player_ref)
             name = player.name
             options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
         reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))

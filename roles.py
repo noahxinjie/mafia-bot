@@ -4,7 +4,7 @@ import copy
 from telegram import Bot, InlineKeyboardButton, Message, Update, ForceReply, User, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, JobQueue
 from abc import ABC, abstractmethod
-
+from chat import Chat
 from player import Player
 
 class Role:
@@ -33,16 +33,6 @@ class Role:
         if footer_buttons:
             menu.append(footer_buttons)
         return menu
-    
-    def remove_from_list(list1, removed) -> None:
-        y = Role.json_to_dict(str(removed))
-        removed_id = y["id"]
-        for x in list1 :
-            z = Role.json_to_dict(x)
-            z_id = z["id"]
-            if removed_id == z_id :
-                list1.remove(x)
-                break
 
     @abstractmethod
     def from_dict(self, source: dict):

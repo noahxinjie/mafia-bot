@@ -38,7 +38,7 @@ class Doctor(Town):
             "night to heal someone, preventing them from dying. The doctor can also choose to heal themself for "\
                 "only 1 time."
     
-   # target's immunity += 1
+   # Save someone from dying
     def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
         temp_alive = copy.deepcopy(alive_list)
         if self.heal_self == 0 :
@@ -46,9 +46,7 @@ class Doctor(Town):
             temp_alive.remove(self.user_id)
         options = []
         for x in temp_alive :
-            player = Player(0, 0, "")
-            doc = player_ref.document(str(x)).get()
-            player.from_dict(doc.to_dict())
+            player = Player.get_player(id=x, player_db=player_ref)
             name = player.name
             options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
         reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))

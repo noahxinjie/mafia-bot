@@ -55,3 +55,10 @@ class Chat:
       "defendant": self.defendant,
       "deathless phases": self.deathless_phases
     })
+
+  @staticmethod
+  def get_chat(id: int, chat_db) :
+      chat = Chat()
+      doc = chat_db.document(str(id)).get()
+      chat.from_dict(doc.to_dict())
+      return chat

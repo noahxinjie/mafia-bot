@@ -35,7 +35,8 @@ class Mayor(Town):
         return 'Mayor leads the Town. There is at most 1 mayor in a game. The mayor can use their ability anytime during '\
             'the day to triple his voting power during voting and judgement phases. However, they will be revealed as the' \
                 'Mayor to everyone.'
-
+    
+    # Reveal to triple voting power
     def ability(self, bot: Bot) -> None:
         if self.votes == 1:
             options = []

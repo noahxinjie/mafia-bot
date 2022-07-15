@@ -41,9 +41,7 @@ class Veteran(Town):
     
     # Goes on alert to gain immunity and shoot everyone who visits him
     def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        player = Player(0, 0, "")
-        doc = player_ref.document(str(self.user_id)).get()
-        player.from_dict(doc.to_dict())
+        player = Player.get_player(id=self.user_id, player_db=player_ref)
         self.immunity = 0
         player.role_instance = str(self)
         player_ref.document(str(self.user_id)).set(player.to_dict())

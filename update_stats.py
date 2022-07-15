@@ -6,9 +6,8 @@ from player import Player
 def update_stats(number: int, player_ref, chat_ref, chat, global_doc1, global_doc2) -> None :
     # update player stats
     for x in chat.players.keys() :
-        player = Player(0, 0, "")
-        player_doc = player_ref.document(x).get()
-        player.from_dict(player_doc.to_dict())
+        a = [int(s) for s in x.split() if s.isdigit()]
+        player = Player.get_player(id=a[0], player_db=player_ref)
         stats = player.stats
         stats["number_of_games_played"] += 1
         roles_percentage_dict = stats["roles_percentage"]
@@ -46,7 +45,6 @@ def update_stats(number: int, player_ref, chat_ref, chat, global_doc1, global_do
             player.stats["loss_percentage"] = (player.stats["number_of_losses"] / player.stats["number_of_games_played"]) * 100
             player.stats["draw_percentage"] = (player.stats["number_of_draws"] / player.stats["number_of_games_played"]) * 100
                         
-        a = [int(s) for s in x.split() if s.isdigit()]
         player_id = a[0]
         if player_id in chat.alive :
             player.stats["survived"] += 1

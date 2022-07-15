@@ -51,6 +51,13 @@ class Player:
         }
       )
 
+    @staticmethod
+    def get_player(id: int, player_db) :
+        player = Player(0, 0, "")
+        doc = player_db.document(str(id)).get()
+        player.from_dict(doc.to_dict())
+        return player
+
     #number == 1 for finding highest and 2 for finding lowest
     def find_lowest_or_highest_winrate(self, number: int) -> int :
       dict1 = self.stats["roles_percentage"]

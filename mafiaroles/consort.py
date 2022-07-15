@@ -34,15 +34,13 @@ class Consort(Mafia):
         return "Consort is part of the Mafia. There are at most 3 consorts in a game. The consort can use their ability during "\
             "the night to block another player's ability."
     
-    # roleblock
+    # Prevent someone from using role
     def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
         temp_alive = copy.deepcopy(alive_list)
         temp_alive.remove(self.user_id)
         options = []
         for x in temp_alive :
-            player = Player(0, 0, "")
-            doc = player_ref.document(str(x)).get()
-            player.from_dict(doc.to_dict())
+            player = Player.get_player(id=x, player_db=player_ref)
             name = player.name
             options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
         reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))

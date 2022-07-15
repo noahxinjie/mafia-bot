@@ -117,9 +117,7 @@ def result_handling(chat_ref, chat_id, chat, player_ref, bot) -> str :
     
     dummy_killing = copy.deepcopy(chat.killing_dict)
     for attacker, attacked in dummy_killing.items() :
-        player = Player(0, 0, "")
-        doc = player_ref.document(str(attacked)).get()
-        player.from_dict(doc.to_dict())
+        player = Player.get_player(id=attacked, player_db=player_ref)
         instance1 = json_to_dict(player.role_instance)
         if instance1["immunity"] > 0 :
             del chat.killing_dict[attacker]
@@ -134,9 +132,7 @@ def result_handling(chat_ref, chat_id, chat, player_ref, bot) -> str :
             a = [int(s) for s in k.split() if s.isdigit()]
             vig_id = a[0]
             target_id = chat.ability_targets[k]
-            target = Player(0, 0, "")
-            doc = player_ref.document(str(target_id)).get()
-            target.from_dict(doc.to_dict())
+            target = Player.get_player(id=target_id, player_db=player_ref)
             instance1 = json_to_dict(target.role_instance)
             if instance1["immunity"] > 0 :
                 bot.send_message(chat_id=vig_id, text="You tried to attack your target but it failed!")
@@ -169,9 +165,8 @@ def result_handling(chat_ref, chat_id, chat, player_ref, bot) -> str :
             targeted = {a:b for (a, b) in chat.ability_targets.items() if v == b}
             for x, y in targeted.items() :
                 if x != k : 
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(x).get()
-                    player.from_dict(doc.to_dict())
+                    a = [int(s) for s in x.split() if s.isdigit()]
+                    player = Player.get_player(id=a[0], player_db=player_ref)
                     visited_list.append(player.name)
             msg = 'People who visited your target last night are:'
             count = 1
@@ -330,9 +325,7 @@ def result_handling(chat_ref, chat_id, chat, player_ref, bot) -> str :
             
             for attacker, attacked in chat.killing_dict.items() :
                 if attacked == x :
-                    player = Player(0, 0, "")
-                    doc = player_ref.document(str(attacked)).get()
-                    player.from_dict(doc.to_dict())
+                    player = Player.get_player(id=attacked, player_db=player_ref)
                     attacked_name = player.name
                     attacked_role_number = chat.players[str(attacked)]
                     attacked_role = roles_dict.get(attacked_role_number)
@@ -357,10 +350,11 @@ def result_handling(chat_ref, chat_id, chat, player_ref, bot) -> str :
                             bot.send_message(chat_id=attacked, text="You are shot by a Vigilante!")    
                             day_msg += f"{msg_count}. {attacked_name} was shot by a Vigilante last night. His role was {attacked_role}.\n"
                             if attacked in chat.town :
-                                player = Player(0, 0, "")
-                                doc = player_ref.document(attacker).get()
-                                player.from_dict(doc.to_dict())
-                                player.role_instance.guilt += 1 # vigilante is guilt-ridden
+                                a = [int(s) for s in attacked.split() if s.isdigit()]
+                                player = Player.get_player(id=a[0], player_db=player_ref)
+                                role_instance = json_to_dict(player.role_instance)
+                                role_instance["guilt"] += 1 # vigilante is guilt-ridden
+                                player.role_instance = json.dumps(role_instance)
                                 player_ref.document(attacker).set(player.to_dict())                  
                         
                         # veteran kills

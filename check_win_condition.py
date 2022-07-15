@@ -38,9 +38,7 @@ def check_win_condition(number: int, player_ref, chat_ref, chat: Chat, role_inst
                 chat.deathless_phases = 6
                 win_condition = True
         else :
-            town_player = Player(0, 0, "")
-            town_player_doc = player_ref.document(str(town_id)).get()
-            town_player.from_dict(town_player_doc.to_dict())
+            town_player = Player.get_player(id=town_id, player_db=player_ref)
             dummy_instance = role_instance_dict.get(town_role_no)
             town_player_role_instance = copy.deepcopy(dummy_instance)
             town_player_role_instance.from_dict(json_to_dict(town_player.role_instance))
