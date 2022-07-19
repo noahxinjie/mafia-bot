@@ -17,6 +17,8 @@ class Chat:
     self.stop_state = 0
     self.defendant = -1
     self.deathless_phases = 0
+    self.fastforward = -1
+    self.time = 0
 
   def from_dict(self, source):
     self.players = source["players"]
@@ -35,6 +37,8 @@ class Chat:
     self.stop_state = source["stop state"]
     self.defendant = source["defendant"]
     self.deathless_phases = source["deathless phases"]
+    self.fastforward = source["fastforward"]
+    self.time = source["time"]
 
   def to_dict(self) -> dict:
     return dict(
@@ -53,7 +57,9 @@ class Chat:
       "game state": self.game_state,
       "stop state": self.stop_state,
       "defendant": self.defendant,
-      "deathless phases": self.deathless_phases
+      "deathless phases": self.deathless_phases,
+      "fastforward": self.fastforward,
+      "time" : self.time
     })
 
   @staticmethod

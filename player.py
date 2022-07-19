@@ -31,21 +31,21 @@ class Player:
         })
 
     def from_dict(self, source):
-      self.user_id = source["user id"]
-      self.chat_id = source["chat id"]
+      self.user_id = source["user_id"]
+      self.chat_id = source["chat_id"]
       self.name = source["name"]
-      self.role_instance = source["role instance"]
-      self.last_vote_count = source["last vote count"]
+      self.role_instance = source["role_instance"]
+      self.last_vote_count = source["last_vote_count"]
       # insert player stats  
       self.stats = source["stats"]
     
     def to_dict(self) -> dict:
       return dict(
-        {"user id": self.user_id,
-        "chat id": self.chat_id,
+        {"user_id": self.user_id,
+        "chat_id": self.chat_id,
         "name": self.name,
-        "role instance": self.role_instance,
-        "last vote count": self.last_vote_count,
+        "role_instance": self.role_instance,
+        "last_vote_count": self.last_vote_count,
         # insert player stats
         "stats": self.stats
         }

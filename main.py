@@ -1,16 +1,8 @@
-from calendar import c
-from cgitb import text
-from email.mime import message
-from genericpath import exists
-from heapq import merge
-from itertools import count
-from multiprocessing.connection import wait
-from pickle import TRUE
 import statistics
 import logging
 import time
 import math
-from multiprocessing import context
+from typing import List
 from chat import Chat
 from player import Player
 from settings import Settings
@@ -39,7 +31,6 @@ import os
 import random
 import telegram
 import firebase_admin
-import investigative_results
 from result_handling import result_handling
 from update_stats import update_stats
 from check_win_condition import check_win_condition
@@ -108,9 +99,13 @@ def join(update : Update, _: CallbackContext) -> None:
             player_ref.document(str(user_id)).set(Player(user_id, chat_id, name).to_dict())
         else :
             player = Player.get_player(id=user_id, player_db=player_ref)
-            if player.chat_id != chat_id :
+            if player.chat_id == 0 :
                 player.chat_id = chat_id
                 player_ref.document(str(user_id)).set(player.to_dict())
+            else :
+                update.message.reply_text(f'{name} cannot join the game as they are currently in an ongoing game in another chat.')
+                return
+
         doc = chat_ref.document(str(chat_id)).get()
         if not doc.exists :
             update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
@@ -143,7 +138,7 @@ def join(update : Update, _: CallbackContext) -> None:
                             fr'{name} joined the game. Lobby is full now, use /start to start the game.')
                     else :
                         update.message.reply_text(
-                        fr'{name} cannot join the game as the lobby is full. Use /start to start the game.')  
+                            fr'{name} cannot join the game as the lobby is full. Use /start to start the game.')  
             else :
                 update.message.reply_text(
                     f'{name} cannot join the game as it has already started.')      
@@ -282,23 +277,30 @@ def start(update: Update, context) -> None:
                 
                 for x in chat.mafia:
                     bot.send_message(x, msg)
-
-                def check_game_state() -> bool :
+                
+                def check_game_state(phase="") :
                     chat1 = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+                    result = [False, False]
                     if chat1.game_state == -1 :                           
                         chat = Chat()
                         chat_ref.document(str(chat_id)).set(chat.to_dict())
-                        return True                    
-                    return False
+                        result[0] = True
+                    if phase == "discussion" :
+                        if type(chat1.fastforward) is dict :
+                            if len(chat1.fastforward["yes"]) == len(chat1.alive) :
+                                result[1] = True
+                    return result
      
                 #Day1
-                if check_game_state() :
-                    return
-
                 chat_settings = Settings()
                 settings_doc = setting_ref.document(str(chat_id)).get()
                 chat_settings.from_dict(settings_doc.to_dict())
                 discussion_time = chat_settings.discussion
+
+                chat.fastforward = -1
+                chat.time = time.time() + discussion_time
+                chat_ref.document(str(chat_id)).set(chat.to_dict())
+
                 bot.send_message(chat_id=chat_id, text=f'Day 1 is starting now. Discussion time: {discussion_time} seconds')
                 
                 #sending ability message to mayor
@@ -323,23 +325,25 @@ def start(update: Update, context) -> None:
                 
                 mayor_ability()
 
-                y = discussion_time / 10
-
+                y = discussion_time / 5
                 for x in range(int(y)) :
-                    if check_game_state() :
-                        return
-                    if x == y - 2 and y > 2:
+                    time.sleep(5)
+                    #if check_game_state(phase="discussion")[0] :
+                        #return
+                    #elif check_game_state(phase="discussion")[1] :
+                        #bot.send_message(chat_id=chat_id, text='Discussion phase has been fast-forwarded.')
+                        #break
+                    if x == y - 5 and y > 4:
                         bot.send_message(chat_id=chat_id, text='20 seconds till end of discussion.')
-                    time.sleep(10)
 
                 bot.send_message(chat_id=chat_id, text='Day 1 has ended.')
       
                 # Night 1
-                if check_game_state() :
-                    return
-                chat.game_state = 3
-                chat_ref.document(str(chat_id)).set(chat.to_dict())
                 night_time = chat_settings.night
+                chat.game_state = 3
+                chat.fastforward = -2
+                chat.time = time.time() + night_time
+                chat_ref.document(str(chat_id)).set(chat.to_dict())
                 bot.send_message(chat_id=chat_id, text=f'Night 1 is starting now. Decision time: {night_time} seconds. Use this time to ' +
                     'decide how to use your ability.')
                 for x in chat.alive :
@@ -368,14 +372,14 @@ def start(update: Update, context) -> None:
                         elif role_number != 1 :
                             instance1.ability(bot, chat.alive, chat.graveyard, chat.town, chat.mafia, player_ref, chat_ref) 
                     
-                y = night_time / 10
+                y = night_time / 5
                 
                 for x in range(int(y)) :
-                    if check_game_state() :
-                        return
-                    if x == y - 2 and y > 2 :
+                    time.sleep(5)
+                    #if check_game_state()[0] :
+                        #return
+                    if x == y - 5 and y > 4 :
                         bot.send_message(chat_id=chat_id, text='20 seconds till end of Night 1')
-                    time.sleep(10)
 
                 bot.send_message(chat_id=chat_id, text='Night 1 has ended.')
       
@@ -415,12 +419,15 @@ def start(update: Update, context) -> None:
                 doc = chat_ref.document(str(chat_id)).get()
                 chat.from_dict(doc.to_dict())
 
+                
                 day = 2
                 while chat.game_state != 0 and chat.deathless_phases < 6:
                     # Check game state at start of every day
-                    if check_game_state() :
+                    if check_game_state()[0] :
                         return
                     chat.game_state = 2
+                    chat.fastforward = -1
+                    chat.time = time.time() + discussion_time
                     chat_ref.document(str(chat_id)).set(chat.to_dict())
                     #Discussion
                     bot.send_message(chat_id=chat_id, text=f'Day {day} is starting now.')
@@ -431,26 +438,27 @@ def start(update: Update, context) -> None:
                     # finding mayor from players dict
                     mayor_ability()
                     
-                    y = discussion_time / 10
+                    y = discussion_time / 5
                     
                     for x in range(int(y)) :
-                        if check_game_state() :
+                        time.sleep(5)
+                        if check_game_state(phase="discussion")[0] :
                             return
-                        if x == y - 2 and y > 2 :
+                        elif check_game_state(phase="discussion")[1] :
+                            break
+                        if x == y - 5 and y > 4 :
                             bot.send_message(chat_id=chat_id, text='20 seconds till end of discussion.')
-                        time.sleep(10)
-
+                    
                     bot.send_message(chat_id=chat_id, text='Discussion has ended.')
       
-                    
                     #Voting
-                    if check_game_state() :
-                        return
                     voting_time = chat_settings.voting
                     bot.send_message(chat_id=chat_id, text=f'Voting is starting now. Time: {voting_time} seconds')
 
                     chat.voting = {}
                     chat.defendant = -1
+                    chat.fastforward = -2
+                    chat.time = time.time() + voting_time
                     chat_ref.document(str(chat_id)).set(chat.to_dict())
 
                     def button_change(time: int, reply_markup, msg: Message) -> None : 
@@ -478,7 +486,7 @@ def start(update: Update, context) -> None:
                             options=options,
                             is_anonymous=False, 
                             allows_multiple_answers=False,
-                            open_period=30)
+                            open_period=voting_time)
 
                         payload = {
                             message.poll.id: {
@@ -490,15 +498,15 @@ def start(update: Update, context) -> None:
 
                     voting_poll()
                        
-                    y = voting_time / 10
+                    y = voting_time / 5
                     
                     for x in range(int(y)) :
-                        if check_game_state() :
+                        time.sleep(5)
+                        if check_game_state()[0] :
                             return
-                        if x == y - 2 and y > 2 :
+                        if x == y - 5 and y > 4 :
                             bot.send_message(chat_id=chat_id, text='20 seconds till end of voting.')
-                        time.sleep(10)
-
+                        
                     bot.send_message(chat_id=chat_id, text='Voting has ended.')
       
 
@@ -507,29 +515,34 @@ def start(update: Update, context) -> None:
                         
                     if chat.defendant != -1 :
                         #Defence
-                        if check_game_state() :
-                            return
                         defendant_id = chat.defendant
                         player = Player.get_player(id=defendant_id, player_db=player_ref)
                         defendant_name = player.name
                         defence_time = chat_settings.defence
+
+                        chat.time = time.time() + defence_time
+                        chat_ref.document(str(chat_id)).set(chat.to_dict())
+
                         bot.send_message(chat_id=chat_id, text=f'{defendant_name} has been voted to the stand. Defence time: {defence_time} seconds. ' +
                             f'{defendant_name}, use this time to defend yourself.')
                         
-                        y = defence_time / 10
+                        y = defence_time / 5
                     
                         for x in range(int(y)) :
-                            if check_game_state() :
+                            time.sleep(5)
+                            if check_game_state()[0] :
                                 return
-                            if x == y - 2 and y > 2 :
+                            if x == y - 5 and y > 4 :
                                 bot.send_message(chat_id=chat_id, text='20 seconds till end of defence.')
-                            time.sleep(10)
                         
                         bot.send_message(chat_id, 'Defence time has ended.')
+                        
                         #Judgement
-                        if check_game_state() :
-                            return
                         judgement_time = chat_settings.judgement
+
+                        chat.time = time.time() + judgement_time
+                        chat_ref.document(str(chat_id)).set(chat.to_dict())
+
                         bot.send_message(chat_id=chat_id, text='Judgement is starting now. Please vote guilty or innocent or abtain ' +
                             f'Time: {judgement_time} seconds')
                         
@@ -556,14 +569,14 @@ def start(update: Update, context) -> None:
                         for x in list :
                             judgement(x)
 
-                        y = judgement_time / 10
+                        y = judgement_time / 5
                     
                         for x in range(int(y)) :
-                            if check_game_state() :
+                            time.sleep(5)
+                            if check_game_state()[0] :
                                 return
-                            if x == y - 2 and y > 2 :
+                            if x == y - 5 and y > 4 :
                                 bot.send_message(chat_id=chat_id, text='20 seconds till end of judgement.')
-                            time.sleep(10)
                         
                         bot.send_message(chat_id, 'Judgement has ended.')
 
@@ -608,9 +621,10 @@ def start(update: Update, context) -> None:
                         break
 
                     #Night
-                    if check_game_state() :
+                    if check_game_state()[0] :
                         return
                     chat.game_state = 3
+                    chat.time = time.time() + night_time
                     chat_ref.document(str(chat_id)).set(chat.to_dict())
                     bot.send_message(chat_id, f'Night {day} is starting now. Decision time: {night_time} seconds. Use this time to ' +
                     'decide how to use your ability.')
@@ -630,14 +644,14 @@ def start(update: Update, context) -> None:
                             instance1.from_dict(dict1)
                             instance1.ability(bot, chat.alive, chat.graveyard, chat.town, chat.alive, player_ref, chat_ref)
                     
-                    y = night_time / 10
+                    y = night_time / 5
                     
                     for x in range(int(y)) :
-                        if check_game_state() :
+                        time.sleep(5)
+                        if check_game_state()[0] :
                             return
-                        if x == y - 2 and y > 2 :
+                        if x == y - 5 and y > 4 :
                             bot.send_message(chat_id=chat_id, text=f'20 seconds till end of Night {day}.')
-                        time.sleep(10)
 
                     bot.send_message(chat_id=chat_id, text=f'Night {day} has ended.')
 
@@ -723,6 +737,9 @@ def start(update: Update, context) -> None:
                         bot.send_message(chat_id, victory_msg)     
                         number_of_winners = 1
 
+                for player_id in chat.players.keys():
+                    player_ref.document(player_id).update({'chat_id' : 0})
+
                 chat = Chat()
                 chat_ref.document(str(chat_id)).set(chat.to_dict())
                 bot.send_message(chat_id, role_reveal_msg)
@@ -765,7 +782,7 @@ def judge_callback(update:Update, _: CallbackContext) -> None :
         else :
             current_chat_ref.update({"guilty": firestore.ArrayUnion([user.id])})
 
-def vote_handling(update: Update, context) -> None :
+def poll_handling(update: Update, context) -> None :
     answer = update.poll_answer
     answered_poll = context.bot_data[answer.poll_id]
     selected_options = answer.option_ids
@@ -774,50 +791,71 @@ def vote_handling(update: Update, context) -> None :
     chat_id = player.chat_id
     chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
     current_chat_ref = chat_ref.document(str(chat_id))
-    #  only process votes by alive players
-    if user_id in chat.alive :
-        if len(selected_options) == 0 : # retract vote update
-            s = "voting." + str(user_id)
-            current_chat_ref.update({s : -1})
-        else :
-            #checking if user voted for himself
-            if selected_options[0] != chat.alive.index(user_id) :
-                selected_id = chat.alive[selected_options[0]]
-                s = str(user_id)
-                #checking if user is mayor and if he used his ability
-                if chat.players[str(user_id)] == 1 :
-                    instance = Mayor(0)
-                    instance.from_dict(json_to_dict(player.role_instance))
-                    if instance.votes == 3 :
-                        player.last_vote_count = 3
-                        current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
+    # voting handling
+    if not type(chat.fastforward) is dict :
+        #  only process votes by alive players
+        if user_id in chat.alive :
+            if len(selected_options) == 0 : # retract vote update
+                s = "voting." + str(user_id)
+                current_chat_ref.update({s : -1})
+            else :
+                #checking if user voted for himself
+                if selected_options[0] != chat.alive.index(user_id) :
+                    selected_id = chat.alive[selected_options[0]]
+                    s = str(user_id)
+                    #checking if user is mayor and if he used his ability
+                    if chat.players[str(user_id)] == 1 :
+                        instance = Mayor(0)
+                        instance.from_dict(json_to_dict(player.role_instance))
+                        if instance.votes == 3 :
+                            player.last_vote_count = 3
+                            current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
+                        else :
+                            player.last_vote_count = 1
+                            current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
+                        player_ref.document(str(user_id)).set(player.to_dict())
                     else :
-                        player.last_vote_count = 1
                         current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
-                    player_ref.document(str(user_id)).set(player.to_dict())
-                else :
-                    current_chat_ref.set({"voting": {s: selected_id}}, merge=True)
-                #checking if vote threshold has been breached
-                chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
-                vote_list = []
-                for x in chat.voting.keys() :
-                    if chat.voting[x] != -1 :
-                        if chat.players[x] == 1 :
-                            a = [int(s) for s in x.split() if s.isdigit()]
-                            player1 = Player.get_player(id=a[0], player_db=player_ref)
-                            if player1.last_vote_count == 3 :
-                                vote_list += 3 * [chat.voting[x]]
+                    #checking if vote threshold has been breached
+                    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+                    vote_list = []
+                    for x in chat.voting.keys() :
+                        if chat.voting[x] != -1 :
+                            if chat.players[x] == 1 :
+                                a = [int(s) for s in x.split() if s.isdigit()]
+                                player1 = Player.get_player(id=a[0], player_db=player_ref)
+                                if player1.last_vote_count == 3 :
+                                    vote_list += 3 * [chat.voting[x]]
+                                else :
+                                    vote_list.append(chat.voting[x])
                             else :
                                 vote_list.append(chat.voting[x])
-                        else :
-                            vote_list.append(chat.voting[x])
-                mode = statistics.mode(vote_list)
-                count = vote_list.count(mode)
-                if count > math.floor(len(chat.alive)/2) :
-                    chat.defendant = mode
-                    chat_ref.document(str(chat_id)).set(chat.to_dict())
-                    context.bot.stop_poll(answered_poll["chat_id"], answered_poll["message_id"])
-            
+                    mode = statistics.mode(vote_list)
+                    count = vote_list.count(mode)
+                    if count > math.floor(len(chat.alive)/2) :
+                        chat.defendant = mode
+                        chat_ref.document(str(chat_id)).set(chat.to_dict())
+                        context.bot.stop_poll(answered_poll["chat_id"], answered_poll["message_id"])
+    # fastforward handling
+    else :
+        if user_id in chat.alive :
+            # retract
+            if len(selected_options) == 0 :
+                if user_id in chat.fastforward["yes"] :
+                    chat_ref.document(str(chat_id)).update({"fastforward.yes" : firestore.ArrayRemove([user_id])})
+                else :
+                    chat_ref.document(str(chat_id)).update({"fastforward.no" : firestore.ArrayRemove([user_id])})
+            else :
+                # voted for yes
+                if selected_options[0] == 0 :
+                    chat_ref.document(str(chat_id)).update({"fastforward.yes" : firestore.ArrayUnion([user_id])})
+                    chat1 = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+                    if len(chat1.fastforward["yes"]) == len(chat1.alive) :
+                        context.bot.stop_poll(answered_poll["chat_id"], answered_poll["message_id"])
+                # voted for no
+                else :
+                    chat_ref.document(str(chat_id)).update({"fastforward.no" : firestore.ArrayUnion([user_id])})
+
 def ability_callback(update: Update, _: CallbackContext) -> None :
     choice = update.callback_query.data
     user = update.effective_user
@@ -878,6 +916,55 @@ def ability_callback(update: Update, _: CallbackContext) -> None :
 def do_nothing(update: Update, _: CallbackContext) -> None :
     pass
 
+def fast_forward(update: Update, context: CallbackContext) -> None :
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if user_id == chat_id :
+        bot.send_message(chat_id=chat_id, text='Invalid command. Please only fast forward a game in a group chat.')
+    else : 
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+        if chat.game_state < 2 :
+            update.message.reply_text(text="There is no ongoing game to fast forward!")
+        else :
+            if chat.fastforward == -2 :
+                update.message.reply_text(text="Game can only be fast-forwarded during the Discussion phase!")
+            elif type(chat.fastforward) is dict :
+                update.message.reply_text(text="Command has already been used.")
+            else :
+                remaining_time = chat.time - time.time()
+                if remaining_time > 30 : 
+                    chat_ref.document(str(chat_id)).update({'fastforward' : {'yes' : [], 'no' : []}})
+                    fastforward_msg = "Choose if you wish to fast forward the discussion phase. \n"
+                    fastforward_msg += "Note that only votes by alive players in the game will count."
+                    message = bot.send_poll(
+                        chat_id=chat_id,
+                            question=fastforward_msg,
+                                options=["Yes", "No"],
+                                    is_anonymous=False, 
+                                        allows_multiple_answers=False,
+                                            open_period=remaining_time)
+                    
+                    payload = {
+                        message.poll.id: {
+                            "message_id": message.message_id,
+                            "chat_id": chat_id
+                        }
+                    }
+                    context.bot_data.update(payload)
+                else :
+                    update.message.reply_text(text="Command can only be used if there is more than 30 seconds left in the Discussion phase.")
+
+def time_left(update: Update, context: CallbackContext) -> None :
+    user_id = update.effective_user.id
+    player = Player.get_player(id=user_id, player_db=player_ref)
+    chat_id = player.chat_id
+    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+    if chat.game_state < 2 :
+        update.message.reply_text(text="There is no ongoing game!")
+    else :
+        remaining_time = int(chat.time - time.time())
+        update.message.reply_text(text=f"There is {remaining_time}s left in the current phase.")
+
 def stats(update: Update, _: CallbackContext) -> None :
     user_id = update.effective_user.id
     player_doc = player_ref.document(str(user_id)).get()
@@ -933,8 +1020,10 @@ def help(update: Update, _: CallbackContext) -> None:
         '3. Use /roles for a list of roles and related information.\n' +
         '4. Use /rules to know more about the general game rules and proceedings.\n'
         '5. Use /alive for a list of alive players during a game.\n' +
-        '6. Use /graveyard for a list of players who died and their respective roles.\n' +
-        '7. Use /stop to stop an ongoing game.')
+        '6. Use /graveyard for a list of players who died and their respective roles during a game.\n' +
+        '7. Use /stats to see your stats over the past games. \n' +
+        '8. Use /stop to stop an ongoing game. The bot will ask for your confirmation.' + 
+        'Use /stop again to confirm your choice or /resume to resume the game.')
 
 def rules(update: Update, _: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -1003,69 +1092,66 @@ def settings(update: Update, _: CallbackContext) -> None:
         " and then the new duration in seconds. E.g. /settings_night 60 \n"
         settings_msg += "Do note that for each phase, there is a lower limit of 10 seconds and upper limit of 10 seconds \n"
         settings_msg += "Duration given must be in multiples of ten. \n"
+        settings_msg += "Duration cannot be changed during an ongoing game. \n"
         settings_msg += "\n"
         settings_msg += "Use /reset_settings to return to default durations of the phases."
         update.message.reply_text(settings_msg)
+        settings_msg = "\n"
+        settings_msg = "Do note that *only the group creator and group admins* can edit the settings."
+        bot.send_message(chat_id=chat_id, text=settings_msg, parse_mode=telegram.ParseMode.MARKDOWN)
 
-def change_settings(chat_id: int, user_id: int, msg: str, phase: str) -> None:
+
+def change_settings(update: Update, phase: str) -> None:
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    msg = update.message.text
     input = msg.split('/settings_' + phase + ' ')
-    if len(input) == 1 :
-        bot.send_message(chat_id=chat_id, text='Please type the new duration of the ' + phase + ' phase as well when using the command.')
-    elif len(input) == 2 :
-        a = input[1]
-        if len(a.split()) == 1 and a.split()[0].isdigit() :
-            b = [int(s) for s in a.split() if s.isdigit()]
-            new_duration = b[0]
-            chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
-            if chat_id == user_id :
-                bot.send_message(chat_id=chat_id, text='Invalid command. Please edit the game settings in a group chat.')
-            else :
-                if not setting_ref.document(str(chat_id)).get().exists :
-                    setting_ref.document(str(chat_id)).set(Settings().to_dict())
-                if chat.game_state > 1 :
-                        bot.send_message(chat_id=chat_id, text='Settings cannot be changed in the middle of a game!')
-                else :
-                    if new_duration < 10 or new_duration > 100 or new_duration % 10 != 0:
-                        bot.send_message(chat_id=chat_id, text='Invalid input. Please choose a duration between 10s and 100s inclusive that is of a multiple of 10.')
-                    else :
-                        setting_doc = setting_ref.document(str(chat_id))
-                        setting_doc.update({phase : new_duration})
-                        bot.send_message(chat_id=chat_id, text="Duration of " + phase + f" has been successfully changed to {new_duration} seconds.")
-        else :
-             bot.send_message(chat_id=chat_id, text='Invalid input. Please type /settings_' + phase + ' followed by a space and then the new duration in seconds.')
+    chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+    if chat_id == user_id :
+        bot.send_message(chat_id=chat_id, text='Invalid command. Please edit the game settings in a group chat.')
     else :
-        bot.send_message(chat_id=chat_id, text='Invalid input. Please type /settings_' + phase + ' followed by a space and then the new duration in seconds.')
+        member = bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+        if member.status != "administrator" and member.status != "creator" :
+            bot.send_message(chat_id=chat_id, text='Only administrators and creator of the group chat can use this command.')
+        else :
+            if len(input) == 1 :
+                bot.send_message(chat_id=chat_id, text='Please type the new duration of the ' + phase + ' phase as well when using the command.')
+            elif len(input) == 2 :
+                a = input[1]
+                if len(a.split()) == 1 and a.split()[0].isdigit() :
+                    b = [int(s) for s in a.split() if s.isdigit()]
+                    new_duration = b[0]
+                    if not setting_ref.document(str(chat_id)).get().exists :
+                        setting_ref.document(str(chat_id)).set(Settings().to_dict())
+                    if chat.game_state > 1 :
+                        bot.send_message(chat_id=chat_id, text='Settings cannot be changed in the middle of a game!')
+                    else :
+                        if new_duration < 10 or new_duration > 100 or new_duration % 5 != 0:
+                            bot.send_message(chat_id=chat_id, text='Invalid input. Please choose a duration between 10s and 100s inclusive that is of a multiple of 5.')
+                        else :
+                            setting_doc = setting_ref.document(str(chat_id))
+                            setting_doc.update({phase : new_duration})
+                            bot.send_message(chat_id=chat_id, text="Duration of " + phase + f" has been successfully changed to {new_duration} seconds.")
+                else :
+                    bot.send_message(chat_id=chat_id, text='Invalid input. Please type /settings_' + phase + ' followed by a space and then the new duration in seconds.')
+            else :
+                bot.send_message(chat_id=chat_id, text='Invalid input. Please type /settings_' + phase + ' followed by a space and then the new duration in seconds.')
 
 
 def settings_discussion(update: Update, _: CallbackContext) -> None:
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.message.text
-    change_settings(chat_id=chat_id, user_id=user_id, msg=msg, phase='discussion')
+    change_settings(update=update, phase='discussion')
     
 def settings_voting(update: Update, _: CallbackContext) -> None:
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.message.text
-    change_settings(chat_id=chat_id, user_id=user_id, msg=msg, phase='voting')
+    change_settings(update=update, phase='voting')
 
 def settings_judgement(update: Update, _: CallbackContext) -> None:
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.message.text
-    change_settings(chat_id=chat_id, user_id=user_id, msg=msg, phase='judgement')
+    change_settings(update=update, phase='judgement')
 
 def settings_defence(update: Update, _: CallbackContext) -> None:
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.message.text
-    change_settings(chat_id=chat_id, user_id=user_id, msg=msg, phase='defence')
+    change_settings(update=update, phase='defence')
 
 def settings_night(update: Update, _: CallbackContext) -> None:
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.message.text
-    change_settings(chat_id=chat_id, user_id=user_id, msg=msg, phase='night')
+    change_settings(update=update, phase='night')
 
 def reset_settings(update: Update, _: CallbackContext) -> None:
     chat_id = update.effective_chat.id
@@ -1073,8 +1159,12 @@ def reset_settings(update: Update, _: CallbackContext) -> None:
     if chat_id == user_id :
         bot.send_message(chat_id=chat_id, text='Invalid command. Please edit the game settings in a group chat.')
     else :
-        setting_ref.document(str(chat_id)).set(Settings().to_dict())
-        bot.send_message(chat_id=chat_id, text='Game settings have been successfully returned to default settings.')
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+        if chat.game_state > 1 :
+            bot.send_message(chat_id=chat_id, text='Settings cannot be changed in the middle of a game!')
+        else :
+            setting_ref.document(str(chat_id)).set(Settings().to_dict())
+            bot.send_message(chat_id=chat_id, text='Game settings have been successfully returned to default settings.')
 
 
 def stop(update: Update, _: CallbackContext) -> None:
@@ -1093,20 +1183,43 @@ def stop(update: Update, _: CallbackContext) -> None:
             if chat.stop_state == 0 :
                 chat.stop_state = 1
                 chat_ref.document(str(chat_id)).set(chat.to_dict())
-                update.message.reply_text('Use /stop again to confirm stoppage of the game. Use /continue to abort stoppage ' +
+                update.message.reply_text('Use /stop again to confirm stoppage of the game. Use /resume to abort stoppage ' +
                         'of game and continue with the current game.')
             else :
                 chat.game_state = -1
                 chat.stop_state = 0
-                chat_ref.document(str(chat_id)).set(chat.to_dict())    
-                update.message.reply_text('Game has been stopped. Use /start to start a new game.')
+                chat_ref.document(str(chat_id)).set(chat.to_dict()) 
+                for player_id in chat.players.keys() :
+                    player_ref.document(player_id).update({'chat_id' : 0})
+                update.message.reply_text('Game will stop after the end of the current phase.' + 
+                'After which, you can use /start to start a new game.')
+
+def resume(update: Update, _: CallbackContext) -> None:
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    doc = chat_ref.document(str(chat_id)).get()
+    if chat_id == user_id :
+        update.message.reply_text('Invalid command. Please use this command in a group chat.')
+    elif not doc.exists :
+        update.message.reply_text('There is no ongoing game now.')
+    else :
+        chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+        if chat.stop_state == 1 :
+            chat.stop_state = 0
+            chat_ref.document(str(chat_id)).set(chat.to_dict())
+            update.message.reply_text('The game has resumed.')
+        elif chat.game_state > 1 :
+            update.message.reply_text('The game is already ongoing!')
+        else :
+            update.message.reply_text('Invalid command. Please use this command after using /stop during an ongoing game.')
+    
 
 def alive(update: Update, _: CallbackContext) -> None:
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     doc = chat_ref.document(str(chat_id)).get()
     if chat_id == user_id :
-        update.message.reply_text('Invalid command.')
+        update.message.reply_text('Invalid command. Please use this command in a group chat.')
     elif not doc.exists :
         update.message.reply_text('There is no ongoing game now.')
     else :
@@ -1128,7 +1241,7 @@ def graveyard(update: Update, _: CallbackContext) -> None:
     user_id = update.effective_user.id
     doc = chat_ref.document(str(chat_id)).get()
     if chat_id == user_id :
-        update.message.reply_text('Invalid command.')
+        update.message.reply_text('Invalid command. Please use this command in a group chat.')
     elif not doc.exists :
         update.message.reply_text('There is no ongoing game now.')
     else :
@@ -1215,6 +1328,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(command="stop", callback=stop, run_async=True))
     dispatcher.add_handler(CommandHandler(command="help", callback=help, run_async=True))
     dispatcher.add_handler(CommandHandler(command="rules", callback=rules, run_async=True))
+    dispatcher.add_handler(CommandHandler(command="resume", callback=resume, run_async=True))
+    dispatcher.add_handler(CommandHandler(command="time", callback=time_left, run_async=True))
 
     dispatcher.add_handler(CommandHandler(command="settings", callback=settings, run_async=True))
     dispatcher.add_handler(CommandHandler(command="settings_discussion", callback=settings_discussion, run_async=True))
@@ -1223,6 +1338,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(command="settings_judgement", callback=settings_judgement, run_async=True))
     dispatcher.add_handler(CommandHandler(command="settings_night", callback=settings_night, run_async=True))
     dispatcher.add_handler(CommandHandler(command="reset_settings", callback=reset_settings, run_async=True))
+    dispatcher.add_handler(CommandHandler(command="fastforward", callback=fast_forward, run_async=True))
     
     dispatcher.add_handler(CommandHandler(command="alive", callback=alive, run_async=True))
     dispatcher.add_handler(CommandHandler(command="graveyard", callback=graveyard, run_async=True))
@@ -1253,7 +1369,7 @@ def main() -> None:
     dispatcher.add_handler(CallbackQueryHandler(callback=ability_callback, pattern='Ability', run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback=do_nothing, pattern='nothing', run_async=True))
 
-    dispatcher.add_handler(PollAnswerHandler(callback=vote_handling, run_async=True))
+    dispatcher.add_handler(PollAnswerHandler(callback=poll_handling, run_async=True))
 
     # on non command i.e message - echo the message on Telegram
     
