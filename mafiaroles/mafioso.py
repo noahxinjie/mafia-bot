@@ -38,15 +38,14 @@ class Mafioso(Mafia):
     
     
     # Kill someone
-    def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        temp_alive = copy.deepcopy(alive_list)
-        temp_town = copy.deepcopy(town_list)
+    def ability(self, bot: Bot, chat: Chat, chat_ref, player_ref, chat_id: int) -> None:
+        temp_alive = copy.deepcopy(chat.alive)
+        temp_town = copy.deepcopy(chat.town)
         options = []
         count = 0
         for x in temp_alive :
             if x in temp_town :
-                player = Player.get_player(id=x, player_db=player_ref)
-                name = player.name
+                name = chat.players[str(x)]["name"]
                 options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
                 count += 1
         reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))

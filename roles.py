@@ -38,7 +38,7 @@ class Role:
     def from_dict(self, source: dict):
         pass
 
-    def update_attribute(self, player_ref, player: Player, target: int) :
+    def update_attribute(self, chat_ref, chat_id: int, target: int) :
         pass
     
 class Town(Role):

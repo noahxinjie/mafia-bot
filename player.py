@@ -13,7 +13,6 @@ class Player:
         self.user_id = user_id
         self.chat_id = chat_id
         self.name = name
-        self.role_instance = ""
         self.last_vote_count = 0
         # player stats attributes
         self.stats = dict({
@@ -34,7 +33,6 @@ class Player:
       self.user_id = source["user_id"]
       self.chat_id = source["chat_id"]
       self.name = source["name"]
-      self.role_instance = source["role_instance"]
       self.last_vote_count = source["last_vote_count"]
       # insert player stats  
       self.stats = source["stats"]
@@ -44,7 +42,6 @@ class Player:
         {"user_id": self.user_id,
         "chat_id": self.chat_id,
         "name": self.name,
-        "role_instance": self.role_instance,
         "last_vote_count": self.last_vote_count,
         # insert player stats
         "stats": self.stats

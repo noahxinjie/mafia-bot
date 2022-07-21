@@ -43,8 +43,8 @@ class Vigilante(Town):
 
     # Can shoot up to 3 people
     # Cannot shoot on 1st night
-    def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        temp_alive = copy.deepcopy(alive_list)
+    def ability(self, bot: Bot, chat: Chat, chat_ref, player_ref, chat_id: int) -> None:
+        temp_alive = copy.deepcopy(chat.alive)
         temp_alive.remove(self.user_id)
         if self.guilt == 1 :
             bot.send_message(chat_id=self.user_id, text= 'You are too guilt-ridden to pick up your gun again after shooting a fellow Town member.')
@@ -52,8 +52,7 @@ class Vigilante(Town):
             if self.bullets != 0 :
                 options = []
                 for x in temp_alive :
-                    player = Player.get_player(id=x, player_db=player_ref)
-                    name = player.name
+                    name = chat.players[str(x)]["name"]
                     options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
                 reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))
                 msg = bot.send_message(chat_id=self.user_id, text='Who do you want to shoot tonight?\n' +
@@ -65,8 +64,8 @@ class Vigilante(Town):
             else :
                 bot.send_message(chat_id=self.user_id, text= 'You have run out of bullets.')
 
-    def update_attribute(self, player_ref, player: Player, target: int):
+    def update_attribute(self, chat_ref, chat_id: int, target: int):
         self.bullets -= 1
-        player.role_instance = str(self)
-        player_ref.document(str(self.user_id)).set(player.to_dict())
+        s = "players." + str(self.user_id) + ".instance"
+        chat_ref.document(str(chat_id)).update({s : str(self)})
         

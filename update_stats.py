@@ -11,8 +11,8 @@ def update_stats(number: int, player_ref, chat_ref, chat, global_doc1, global_do
         stats = player.stats
         stats["number_of_games_played"] += 1
         roles_percentage_dict = stats["roles_percentage"]
-        role_percentage_list = roles_percentage_dict[str(chat.players[x])]
-        if chat.players[x] < 12 :
+        role_percentage_list = roles_percentage_dict[str(chat.players[x]["role"])]
+        if chat.players[x]["role"] < 12 :
             stats["number_of_games_as_town"] += 1
             # Town wins
             if number == 1 :

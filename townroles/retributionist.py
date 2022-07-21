@@ -39,23 +39,19 @@ class Retributionist(Town):
             "their ability during the night to revive a dead Town player for a maximum of 1 time."
 
    # Revive a dead Town player
-    def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        temp_graveyard = copy.deepcopy(graveyard_list)
-        temp_town = copy.deepcopy(town_list)
+    def ability(self, bot: Bot, chat: Chat, chat_ref, player_ref, chat_id: int) -> None:
+        temp_graveyard = copy.deepcopy(chat.graveyard)
+        temp_town = copy.deepcopy(chat.town)
         if self.revive == 1 :
             if len(temp_graveyard) == 0 :
                 bot.send_message(chat_id=self.user_id, text= 'There is no one in the graveyard that you can revive yet.')
             else :
                 options = []            
-                player = Player.get_player(id=self.user_id, player_db=player_ref)
-                chat_id = player.chat_id
-                chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
                 temp_cleaned = copy.deepcopy(chat.cleaned)
 
                 for x in temp_graveyard :
                     if x in temp_town and x not in temp_cleaned:
-                        player = Player.get_player(id=x, player_db=player_ref)
-                        name = player.name
+                        name = chat.players[str(x)]["name"]
                         options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
                 reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))
                 msg = bot.send_message(chat_id=self.user_id, text='Who do you want to revive? You can only revive someone once', reply_markup=reply)
@@ -67,7 +63,8 @@ class Retributionist(Town):
         else :
             bot.send_message(chat_id=self.user_id, text= 'You have already revived someone before.')
         
-    def update_attribute(self, player_ref, player: Player, target: int):
+    def update_attribute(self, chat_ref, chat_id: int, target: int):
         self.revive -= 1
-        player.role_instance = str(self)
-        player_ref.document(str(self.user_id)).set(player.to_dict())
+        s = "players." + str(self.user_id) + ".instance"
+        chat_ref.document(str(chat_id)).update({s : str(self)})
+        

@@ -40,11 +40,10 @@ class Veteran(Town):
     
     
     # Goes on alert to gain immunity and shoot everyone who visits him
-    def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        player = Player.get_player(id=self.user_id, player_db=player_ref)
+    def ability(self, bot: Bot, chat: Chat, chat_ref, player_ref, chat_id: int) -> None:
         self.immunity = 0
-        player.role_instance = str(self)
-        player_ref.document(str(self.user_id)).set(player.to_dict())
+        s = "players." + str(self.user_id) + ".instance"
+        chat_ref.document(str(chat_id)).update({s : str(self)})
         if self.alerts != 0 :
             options = []
             options.append(InlineKeyboardButton(text='Yes', callback_data='Ability:1'))
@@ -60,9 +59,9 @@ class Veteran(Town):
         else :
             bot.send_message(chat_id=self.user_id, text='You have already gone on alert for 3 times.')
 
-    def update_attribute(self, player_ref, player: Player, target: int):
+    def update_attribute(self, chat_ref, chat_id: int, target: int):
         if target == 1 :
             self.alerts -= 1
             self.immunity += 1
-            player.role_instance = str(self)
-            player_ref.document(str(self.user_id)).set(player.to_dict())
+            s = "players." + str(self.user_id) + ".instance"
+            chat_ref.document(str(chat_id)).update({s : str(self)})

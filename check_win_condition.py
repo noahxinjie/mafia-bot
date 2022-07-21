@@ -18,8 +18,8 @@ def check_win_condition(number: int, player_ref, chat_ref, chat: Chat, role_inst
     elif len(chat.town) == 1 and len(chat.mafia) == 1 :
         town_id = chat.town[0]
         mafia_id = chat.mafia[0]
-        town_role_no = chat.players[str(town_id)]
-        mafia_role_no = chat.players[str(mafia_id)]
+        town_role_no = chat.players[str(town_id)]["role"]
+        mafia_role_no = chat.players[str(mafia_id)]["role"]
         # mafia and other town roles
         if town_role_no > 6 :
             win_condition = True # mafia wins
@@ -38,10 +38,9 @@ def check_win_condition(number: int, player_ref, chat_ref, chat: Chat, role_inst
                 chat.deathless_phases = 6
                 win_condition = True
         else :
-            town_player = Player.get_player(id=town_id, player_db=player_ref)
             dummy_instance = role_instance_dict.get(town_role_no)
             town_player_role_instance = copy.deepcopy(dummy_instance)
-            town_player_role_instance.from_dict(json_to_dict(town_player.role_instance))
+            town_player_role_instance.from_dict(json_to_dict(chat.players[str(town_id)]["instance"]))
             # mafia and vigilante 
             if town_role_no == 5 :
                 # if last mafia standing is godfather

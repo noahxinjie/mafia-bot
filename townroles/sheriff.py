@@ -38,13 +38,12 @@ class Sheriff(Town):
     # Discovering if someone is innocent or guilty. 
     # If target is mafia he is guilty with exception of godfather
     # If target is town or godfather he is innocent
-    def ability(self, bot: Bot, alive_list: list, graveyard_list: list, town_list: list, mafia_list: list, player_ref, chat_ref) -> None:
-        temp_alive = copy.deepcopy(alive_list)
+    def ability(self, bot: Bot, chat: Chat, chat_ref, player_ref, chat_id: int) -> None:
+        temp_alive = copy.deepcopy(chat.alive)
         temp_alive.remove(self.user_id)
         options = []
         for x in temp_alive :
-            player = Player.get_player(id=x, player_db=player_ref)
-            name = player.name
+            name = chat.players[str(x)]["name"]
             options.append(InlineKeyboardButton(text=f'{name}', callback_data='Ability:' + str(x)))
         reply = InlineKeyboardMarkup(Role.build_menu(options, n_cols=1))
         msg = bot.send_message(chat_id=self.user_id, text='Who do you want to interrogate tonight?', reply_markup=reply)
