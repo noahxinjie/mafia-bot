@@ -2,6 +2,7 @@ import statistics
 import logging
 import time
 import math
+from typing import List
 from chat import Chat
 from player import Player
 from settings import Settings
