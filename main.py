@@ -123,7 +123,7 @@ def join(update : Update, _: CallbackContext) -> None:
                             doc = chat_ref.document(str(chat_id)).get()
                             chat.from_dict(doc.to_dict())
                             update_msg = f'{name} has joined the game. Use /withdraw if you wish to withdraw from the game lobby.\n'
-                            update_msg += '*For first-time users, do use /start in a private message to the Mafia Moderator Bot.*\n'
+                            update_msg += '*For first-time users, do use /start in a private message to the Mafia Bot Test Bot.*\n'
                             update_msg += f'Number of people in game lobby now: {len(chat.players)}\nPeople in the game lobby:'
                             count = 1
                             for x in chat.alive :

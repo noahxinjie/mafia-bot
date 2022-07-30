@@ -44,7 +44,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
     escort_consort_dict = {k:v for (k, v) in chat.ability_targets.items() if chat.players[k]["role"] == 2 or chat.players[k]["role"] == 14}
     if len(escort_consort_dict) != 0 :
         for k, v in escort_consort_dict.items() :
-            if chat.players[str(v)]["role"] == 2 or 3 or 14 :
+            if chat.players[str(v)]["role"] == 2 or chat.players[str(v)]["role"] == 3 or chat.players[str(v)]["role"] == 14 :
                 bot.send_message(chat_id=v, text='Someone tried to roleblock you but you are immune!')
             else :
                 bot.send_message(chat_id=v, text='You are roleblocked!')
