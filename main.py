@@ -77,10 +77,10 @@ role_instance_dict = {1: Mayor(0), 2: Escort(0), 3: Transporter(0), 4: Retributi
 # Define a few command handlers. These usually take the two arguments update and
 # context.
 
-def json_to_dict(x) -> dict:
-    x = x.replace("\'", "\"")
-    x = x.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
-    x = x.replace('"is_bot": True', '"is_bot": "True"')
+def json_to_dict(json_input) -> dict:
+    json_input = json_input.replace("\'", "\"")
+    json_input = json_input.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
+    json_input = json_input.replace('"is_bot": True', '"is_bot": "True"')
     return json.loads(x)
 
 def join(update : Update, _: CallbackContext) -> None:
@@ -116,9 +116,9 @@ def join(update : Update, _: CallbackContext) -> None:
                         update.message.reply_text(f'{name} has already joined the game!')
                     else :
                         current_chat_ref = chat_ref.document(str(chat_id))
-                        s = "players." + str(user_id)
+                        key = "players." + str(user_id)
                         if len(chat.players) < 14 : 
-                            current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}})                      
+                            current_chat_ref.update({key : {"name" : name, "role" : 0, "instance" : ""}})                      
                             current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
                             doc = chat_ref.document(str(chat_id)).get()
                             chat.from_dict(doc.to_dict())
@@ -163,8 +163,8 @@ def withdraw(update : Update, _: CallbackContext) -> None:
                     player = Player.get_player(id=user_id, player_db=player_ref)
                     player.chat_id = 0
                     player_ref.document(str(user_id)).set(player.to_dict())
-                    s = "players." + str(user_id)
-                    chat_ref.document(str(chat_id)).update({s : firestore.DELETE_FIELD})
+                    key = "players." + str(user_id)
+                    chat_ref.document(str(chat_id)).update({key : firestore.DELETE_FIELD})
                     chat_ref.document(str(chat_id)).update({"alive" : firestore.ArrayRemove([user_id])})
                     doc = chat_ref.document(str(chat_id)).get()
                     chat.from_dict(doc.to_dict())
@@ -310,12 +310,12 @@ def start(update: Update, context) -> None:
                 
                 # Assign remaining town players 
                 for x in range(number_of_random_town_players): 
-                    number = random.randint(5, 5)
+                    number = random.randint(1, 11)
                     assign(number)
 
                 # Assign remaining mafia players            
                 for x in range(number_of_mafia_players - 1):
-                    number = random.randint(6, 6)
+                    number = random.randint(12, 17)
                     assign(number)
 
                 #Sending a message of mafia list to all in mafia faction
@@ -451,9 +451,9 @@ def start(update: Update, context) -> None:
                             chat.players[str(random_choice)]["role"] = 13
                             mafioso_instance = str(Mafioso(random_choice))
                             chat.players[str(random_choice)]["instance"] = mafioso_instance
-                            s = "players." + str(random_choice) + ".instance"
-                            t = "players." + str(random_choice) + ".role"
-                            chat_ref.document(str(chat_id)).update({s : mafioso_instance, t : 13})
+                            instance_key = "players." + str(random_choice) + ".instance"
+                            role_key = "players." + str(random_choice) + ".role"
+                            chat_ref.document(str(chat_id)).update({instance_key : mafioso_instance, role_key : 13})
                             name = chat.players[str(random_choice)]["name"]
                             for y in chat.mafia :  
                                 if y == random_choice :
@@ -933,8 +933,8 @@ def ability_callback(update: Update, _: CallbackContext) -> None :
                 reply = InlineKeyboardMarkup([[InlineKeyboardButton(text='You have successfully used your ability', callback_data='nothing')]])
                 update.callback_query.edit_message_reply_markup(reply_markup=reply)
                 instance.votes = 3
-                s = "players." + str(user.id) + ".instance"
-                chat_ref.document(str(chat_id)).update({s : str(instance)})
+                key = "players." + str(user.id) + ".instance"
+                chat_ref.document(str(chat_id)).update({key : str(instance)})
                 bot.send_message(chat_id=chat_id, text=f'{player.name} has revealed themself as the Mayor. They now have triple the ' +
                     'voting power.')
     # Transporter handling

@@ -5,14 +5,14 @@ from player import Player
 # 1 if town wins 2 if mafia wins 3 if draw
 def update_stats(number: int, player_ref, chat_ref, chat, global_doc1, global_doc2) -> None :
     # update player stats
-    for x in chat.players.keys() :
-        a = [int(s) for s in x.split() if s.isdigit()]
-        player = Player.get_player(id=a[0], player_db=player_ref)
+    for current_player in chat.players.keys() :
+        current_player_id = [int(s) for s in current_player.split() if s.isdigit()][0]
+        player = Player.get_player(id=current_player_id, player_db=player_ref)
         stats = player.stats
         stats["number_of_games_played"] += 1
         roles_percentage_dict = stats["roles_percentage"]
-        role_percentage_list = roles_percentage_dict[str(chat.players[x]["role"])]
-        if chat.players[x]["role"] < 12 :
+        role_percentage_list = roles_percentage_dict[str(chat.players[current_player]["role"])]
+        if chat.players[current_player]["role"] < 12 :
             stats["number_of_games_as_town"] += 1
             # Town wins
             if number == 1 :
@@ -45,11 +45,10 @@ def update_stats(number: int, player_ref, chat_ref, chat, global_doc1, global_do
             player.stats["loss_percentage"] = (player.stats["number_of_losses"] / player.stats["number_of_games_played"]) * 100
             player.stats["draw_percentage"] = (player.stats["number_of_draws"] / player.stats["number_of_games_played"]) * 100
                         
-        player_id = a[0]
-        if player_id in chat.alive :
+        if current_player_id in chat.alive :
             player.stats["survived"] += 1
                         
-        player_ref.document(x).set(player.to_dict())
+        player_ref.document(current_player).set(player.to_dict())
                     
     # update global stats
     number_of_players = len(chat.players)
