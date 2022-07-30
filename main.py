@@ -81,7 +81,7 @@ def json_to_dict(json_input) -> dict:
     json_input = json_input.replace("\'", "\"")
     json_input = json_input.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
     json_input = json_input.replace('"is_bot": True', '"is_bot": "True"')
-    return json.loads(x)
+    return json.loads(json_input)
 
 def join(update : Update, _: CallbackContext) -> None:
     user = update.effective_user
@@ -132,7 +132,7 @@ def join(update : Update, _: CallbackContext) -> None:
                                 count += 1
                             bot.send_message(chat_id=chat_id, text=update_msg, parse_mode=telegram.ParseMode.MARKDOWN)
                         elif len(chat.players) == 14 :
-                            current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}}) 
+                            current_chat_ref.update({key : {"name" : name, "role" : 0, "instance" : ""}}) 
                             current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
                             update.message.reply_text(
                                 fr'{name} joined the game. Lobby is full now, use /start to start the game.')
