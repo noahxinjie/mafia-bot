@@ -93,7 +93,8 @@ def join(update : Update, _: CallbackContext) -> None:
     else :
         player_doc = player_ref.document(str(user_id)).get()
         if not player_doc.exists :
-            player_ref.document(str(user_id)).set(Player(user_id, chat_id, name).to_dict())
+            warning_msg = "You have not initialized contact with the bot yet! *Please message the bot privately with the /start command.*"
+            bot.send_message(chat_id=chat_id, text=warning_msg, parse_mode=telegram.ParseMode.MARKDOWN)
         else :
             player = Player.get_player(id=user_id, player_db=player_ref)
             if player.chat_id == 0 :
@@ -103,48 +104,102 @@ def join(update : Update, _: CallbackContext) -> None:
                 update.message.reply_text(f'{name} cannot join the game as they are currently in an ongoing game in another chat.')
                 return
 
+            doc = chat_ref.document(str(chat_id)).get()
+            if not doc.exists :
+                update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
+            else :
+                chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
+                if chat.game_state == 0 :
+                    update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
+                elif chat.game_state == 1 :
+                    if user_id in chat.alive :
+                        update.message.reply_text(f'{name} has already joined the game!')
+                    else :
+                        current_chat_ref = chat_ref.document(str(chat_id))
+                        s = "players." + str(user_id)
+                        if len(chat.players) < 14 : 
+                            current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}})                      
+                            current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
+                            doc = chat_ref.document(str(chat_id)).get()
+                            chat.from_dict(doc.to_dict())
+                            update_msg = f'{name} has joined the game. Use /withdraw if you wish to withdraw from the game lobby.\n'
+                            update_msg += '*For first-time users, do use /start in a private message to the Mafia Moderator Bot.*\n'
+                            update_msg += f'Number of people in game lobby now: {len(chat.players)}\nPeople in the game lobby:'
+                            count = 1
+                            for x in chat.alive :
+                                x_name = chat.players[str(x)]["name"]
+                                update_msg += f'\n{count}. {x_name}'
+                                count += 1
+                            bot.send_message(chat_id=chat_id, text=update_msg, parse_mode=telegram.ParseMode.MARKDOWN)
+                        elif len(chat.players) == 14 :
+                            current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}}) 
+                            current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
+                            update.message.reply_text(
+                                fr'{name} joined the game. Lobby is full now, use /start to start the game.')
+                        else :
+                            update.message.reply_text(
+                                fr'{name} cannot join the game as the lobby is full. Use /start to start the game.')  
+                else :
+                    update.message.reply_text(
+                        f'{name} cannot join the game as it has already started.')     
+
+def withdraw(update : Update, _: CallbackContext) -> None:
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    user_id = user.id
+    name = user.full_name
+    if chat_id == user_id :
+        update.message.reply_text("Invalid command. Please use /withdraw in a group chat.")
+    else :
         doc = chat_ref.document(str(chat_id)).get()
         if not doc.exists :
-            update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
+            update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game first.')
         else :
             chat = Chat.get_chat(id=chat_id, chat_db=chat_ref)
             if chat.game_state == 0 :
-                update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game.')
+                update.message.reply_text('There is no ongoing game now. Use /start to initialize a new game first.')
             elif chat.game_state == 1 :
                 if user_id in chat.alive :
-                    update.message.reply_text(f'{name} has already joined the game!')
-                else :
-                    current_chat_ref = chat_ref.document(str(chat_id))
+                    player = Player.get_player(id=user_id, player_db=player_ref)
+                    player.chat_id = 0
+                    player_ref.document(str(user_id)).set(player.to_dict())
                     s = "players." + str(user_id)
-                    if len(chat.players) < 14 : 
-                        current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}})                      
-                        current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
-                        doc = chat_ref.document(str(chat_id)).get()
-                        chat.from_dict(doc.to_dict())
-                        update_msg = f'{name} has joined the game. *For first-time users, do use /start in a private message to the Mafia Moderator Bot.*\nNumber of people in game lobby now: {len(chat.players)}\nPeople in the game lobby:'
+                    chat_ref.document(str(chat_id)).update({s : firestore.DELETE_FIELD})
+                    chat_ref.document(str(chat_id)).update({"alive" : firestore.ArrayRemove([user_id])})
+                    doc = chat_ref.document(str(chat_id)).get()
+                    chat.from_dict(doc.to_dict())
+                    update_msg = f'{name} has successfully withdrawn from the game lobby.\n'
+                    if len(chat.alive) == 0 :
+                        update_msg += "The game lobby is now empty. Use /join to join the game."
+                    else :
+                        update_msg += f'Number of people in game lobby now: {len(chat.players)}\nPeople in the game lobby:'
                         count = 1
                         for x in chat.alive :
                             x_name = chat.players[str(x)]["name"]
                             update_msg += f'\n{count}. {x_name}'
                             count += 1
-                        bot.send_message(chat_id=chat_id, text=update_msg, parse_mode=telegram.ParseMode.MARKDOWN)
-                    elif len(chat.players) == 14 :
-                        current_chat_ref.update({s : {"name" : name, "role" : 0, "instance" : ""}}) 
-                        current_chat_ref.update({"alive": firestore.ArrayUnion([user_id])})
-                        update.message.reply_text(
-                            fr'{name} joined the game. Lobby is full now, use /start to start the game.')
+                    
+                    update.message.reply_text(update_msg)
+                else :
+                    player = Player.get_player(id=user_id, player_db=player_ref)
+                    if player.chat_id == 0 :
+                        update.message.reply_text(f'{name} is not currently in any game lobby!')
                     else :
-                        update.message.reply_text(
-                            fr'{name} cannot join the game as the lobby is full. Use /start to start the game.')  
+                        update.message.reply_text(f'{name} is currently in an ongoing game in another group chat!')
             else :
-                update.message.reply_text(
-                    f'{name} cannot join the game as it has already started.')      
+                update.message.reply_text("You cannot withdraw in the middle of an ongoing game.")
+
 
 def start(update: Update, context) -> None:
+    user = update.effective_user
     chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    user_id = user.id
+    name = user.full_name
     if chat_id == user_id :
         update.message.reply_text('Welcome to Mafia Bot. This chat is the place where you make individual decisions during games.')
+        player_doc = player_ref.document(str(user_id)).get()
+        if not player_doc.exists :
+            player_ref.document(str(user_id)).set(Player(user_id, 0, name).to_dict())
     else :
         chat_doc = chat_ref.document(str(chat_id)).get()
         if not chat_doc.exists :
@@ -1297,6 +1352,7 @@ def main() -> None:
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler(command="start", callback=start, run_async=True))
     dispatcher.add_handler(CommandHandler(command="join", callback=join, run_async=True))
+    dispatcher.add_handler(CommandHandler(command="withdraw", callback=withdraw, run_async=True))
     dispatcher.add_handler(CommandHandler(command="stop", callback=stop, run_async=True))
     dispatcher.add_handler(CommandHandler(command="help", callback=help, run_async=True))
     dispatcher.add_handler(CommandHandler(command="rules", callback=rules, run_async=True))
