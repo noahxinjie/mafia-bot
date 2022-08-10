@@ -4,11 +4,11 @@ import investigative_results
 import copy
 import json
 
-def json_to_dict(x) -> dict:
-    x = x.replace("\'", "\"")
-    x = x.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
-    x = x.replace('"is_bot": True', '"is_bot": "True"')
-    return json.loads(x)
+def json_to_dict(json_input) -> dict:
+    json_input = json_input.replace("\'", "\"")
+    json_input = json_input.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
+    json_input = json_input.replace('"is_bot": True', '"is_bot": "True"')
+    return json.loads(json_input)
 
 roles_dict = {1:'Mayor', 2:'Escort', 3:'Transporter', 4:'Retributionist', 5:'Vigilante', 6:'Veteran', 7:'Bodyguard', 8:'Doctor',
     9:'Investigator', 10:'Sheriff', 11:'Lookout', 12:'Godfather', 13:'Mafioso', 14:'Consort', 15:'Consigliere', 
@@ -63,7 +63,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
     investigative_dict = {k:v for (k, v) in chat.ability_targets.items() if chat.players[k]["role"] == 9 or chat.players[k]["role"] == 10 or chat.players[k]["role"] == 15}
     if len(investigative_dict) != 0 :
         for k, v in investigative_dict.items() :
-            a = [int(s) for s in k.split() if s.isdigit()]
+            investigative_id = [int(s) for s in k.split() if s.isdigit()][0]
             # investigator
             if chat.players[k]["role"] == 9:
                 if v in chat.framed :
@@ -72,21 +72,21 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                     number = chat.players[str(v)]["role"]
                     for k, v in investigative_results.invest_results.items() :
                         if number in v :
-                            bot.send_message(chat_id=a[0], text=k)
+                            bot.send_message(chat_id=investigative_id, text=k)
             # sheriff
             elif chat.players[k]["role"] == 10:
                 if v in chat.framed :
-                    bot.send_message(chat_id=a[0], text="Your target seems suspicious!")
+                    bot.send_message(chat_id=investigative_id, text="Your target seems suspicious!")
                 else :
                     number = chat.players[str(v)]["role"]
-                    bot.send_message(chat_id=a[0], text=investigative_results.sheriff_results[number])
+                    bot.send_message(chat_id=investigative_id, text=investigative_results.sheriff_results[number])
             # consigliere    
             else :
                 if v in chat.framed :
-                    bot.send_message(chat_id=a[0], text="Your target tampers with evidence. They must be a Framer.")
+                    bot.send_message(chat_id=investigative_id, text="Your target tampers with evidence. They must be a Framer.")
                 else :
                     number = chat.players[str(v)]["role"]
-                bot.send_message(chat_id=a[0], text=investigative_results.consig_results[number])
+                    bot.send_message(chat_id=investigative_id, text=investigative_results.consig_results[number])
     
     # Priority Four
     # killing
@@ -113,8 +113,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
         del chat.killing_dict[godfather]
         gf_kills = False
         chat.killing_dict[mafioso] = target
-        a = [int(s) for s in mafioso.split() if s.isdigit()]
-        mafioso_id = a[0]
+        mafioso_id = [int(s) for s in mafioso.split() if s.isdigit()][0]
         bot.send_message(chat_id=mafioso_id, text="You have attacked the target the Godfather ordered you to!")
     
     dummy_killing = copy.deepcopy(chat.killing_dict)
@@ -124,15 +123,13 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
         if instance1["immunity"] > 0 :
             del chat.killing_dict[attacker]
             bot.send_message(chat_id=attacked, text="Someone tried to attack you but you are immune!")  
-            a = [int(s) for s in attacker.split() if s.isdigit()]                
-            attacker_id = a[0]
+            attacker_id = [int(s) for s in attacker.split() if s.isdigit()][0]                
             bot.send_message(chat_id=attacker_id, text="You tried to attack your target but it failed!")   
 
     # vigilante 
     for k in chat.ability_targets.keys() :
         if chat.players[k]["role"] == 5 :
-            a = [int(s) for s in k.split() if s.isdigit()]
-            vig_id = a[0]
+            vig_id = [int(s) for s in k.split() if s.isdigit()][0]
             target_id = chat.ability_targets[k]
             role_instance = chat.players[str(target_id)]["instance"]
             instance1 = json_to_dict(role_instance)
@@ -163,11 +160,10 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
     if len(lookout_dict) != 0 :
         for k, v in lookout_dict.items() :
             visited_list = []
-            k_id = [int(s) for s in k.split() if s.isdigit()]
+            k_id = [int(s) for s in k.split() if s.isdigit()][0]
             targeted = {a:b for (a, b) in chat.ability_targets.items() if v == b}
             for x, y in targeted.items() :
                 if x != k : 
-                    a = [int(s) for s in x.split() if s.isdigit()]
                     name = chat.players[x]["name"]
                     visited_list.append(name)
             msg = 'People who visited your target last night are:'
@@ -177,9 +173,9 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                 count += 1
 
             if len(visited_list) != 0 :
-                bot.send_message(chat_id=k_id[0], text=msg)
+                bot.send_message(chat_id=k_id, text=msg)
             else :
-                bot.send_message(chat_id=k_id[0], text="No one visited your target last night.")
+                bot.send_message(chat_id=k_id, text="No one visited your target last night.")
     
     # Priority Seven
     # veteran v = 1 means alert v = 2 means no alert
@@ -187,17 +183,17 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
     if len(veteran_dict) != 0 :
         for k, v in veteran_dict.items() :
             if v == 1 :
-                k_id = [int(s) for s in k.split() if s.isdigit()]
+                k_id = [int(s) for s in k.split() if s.isdigit()][0]
                 targeted = {a:b for (a, b) in chat.ability_targets.items() if b == k_id[0]}
                 vet_killcount = 0
                 for x in targeted.keys() :
-                    x_id = [int(s) for s in x.split() if s.isdigit()]
+                    x_id = [int(s) for s in x.split() if s.isdigit()][0]
                     vet_killcount += 1
-                    chat.killing_dict[k] = x_id[0]
+                    chat.killing_dict[k] = x_id
             if vet_killcount == 1 :
-                bot.send_message(chat_id=k_id[0], text=f'You shot a person who visited you tonight!')
+                bot.send_message(chat_id=k_id, text=f'You shot a person who visited you tonight!')
             elif vet_killcount > 1 :
-                bot.send_message(chat_id=k_id[0], text=f"You shot {vet_killcount} people who visited you tonight!")
+                bot.send_message(chat_id=k_id, text=f"You shot {vet_killcount} people who visited you tonight!")
 
     # Priority Eight
     # protective
@@ -209,8 +205,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
         for bodyguard, defended in dummy_protective.items() :
             if chat.players[bodyguard]["role"] == 7 :
                 number_of_bodyguards += 1
-                a = [int(s) for s in bodyguard.split() if s.isdigit()]
-                bodyguard_id = a[0]
+                bodyguard_id = [int(s) for s in bodyguard.split() if s.isdigit()][0]
                 count = 0
                 if defended in chat.killing_dict.values() : # checking how many times defended was attacked
                     for target in chat.killing_dict.values() :
@@ -222,8 +217,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                         dummy_killing = copy.deepcopy(chat.killing_dict)
                         for attacker, attacked in dummy_killing.items() :
                             if bodyguard_id == attacked :
-                                b = [int(s) for s in attacker.split() if s.isdigit()]
-                                attacker_id = b[0]
+                                attacker_id = [int(s) for s in attacker.split() if s.isdigit()][0]
                                 bot.send_message(chat_id=attacker_id, text="You tried to attack your target but it failed!")
                                 del chat.killing_dict[attacker]
                         del protective_dict[bodyguard]
@@ -231,8 +225,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                         dummy_killing = copy.deepcopy(chat.killing_dict)
                         for attacker, target in dummy_killing.items() :
                             if defended == target :
-                                b = [int(s) for s in attacker.split() if s.isdigit()]
-                                attacker_id = b[0]
+                                attacker_id = [int(s) for s in attacker.split() if s.isdigit()][0]
                                 if chat.players[str(attacker_id)]["role"] != 6 : # if defended did not die by visiting a vet
                                     chat.killing_dict["B" + str(number_of_bodyguards)] = bodyguard_id # bodyguard dies
                                     chat.killing_dict[bodyguard] = attacker_id # attacker dies
@@ -247,8 +240,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
         dummy_protective = copy.deepcopy(protective_dict)
         for doctor, defended in dummy_protective.items() :
             if chat.players[doctor]["role"] == 8 :
-                a = [int(s) for s in doctor.split() if s.isdigit()]
-                doctor_id = a[0]
+                doctor_id = [int(s) for s in doctor.split() if s.isdigit()][0]
                 count = 0
                 if defended in chat.killing_dict.values() : # checking how many times defended was attacked
                     for target in chat.killing_dict.values() :
@@ -260,8 +252,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                         dummy_killing = copy.deepcopy(chat.killing_dict)
                         for attacker, defended in dummy_killing.items() :
                             if doctor_id == defended :
-                                b = [int(s) for s in attacker.split() if s.isdigit()]
-                                attacker_id = b[0]
+                                attacker_id = [int(s) for s in attacker.split() if s.isdigit()][0]
                                 bot.send_message(chat_id=attacker_id, text="You tried to attack your target but it failed!")
                                 del chat.killing_dict[attacker]
                         del protective_dict[doctor]
@@ -286,8 +277,7 @@ def result_handling(chat_ref, chat_id, chat: Chat, player_ref, bot) -> str :
                                     "but a Doctor nursed you back to health!")
                                 # if doctor nurses someone attacked by mafia or vigilante
                                 else :
-                                    b = [int(s) for s in attacker.split() if s.isdigit()]
-                                    attacker_id = b[0]
+                                    attacker_id = [int(s) for s in attacker.split() if s.isdigit()][0]
                                     bot.send_message(chat_id=attacker_id, text="You tried to attack your target but it failed!")
                                     bot.send_message(chat_id=target, text="Someone tried to attack you but a Doctor nursed you back to health!")
                         del protective_dict[doctor]

@@ -63,5 +63,5 @@ class Veteran(Town):
         if target == 1 :
             self.alerts -= 1
             self.immunity += 1
-            s = "players." + str(self.user_id) + ".instance"
-            chat_ref.document(str(chat_id)).update({s : str(self)})
+            key_string = "players." + str(self.user_id) + ".instance"
+            chat_ref.document(str(chat_id)).update({key_string : str(self)})

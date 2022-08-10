@@ -59,6 +59,6 @@ class Doctor(Town):
     def update_attribute(self, chat_ref, chat_id: int, target: int):
         if target == self.user_id :
             self.heal_self -= 1
-            s = "players." + str(self.user_id) + ".instance"
-            chat_ref.document(str(chat_id)).update({s : str(self)})
+            key_string = "players." + str(self.user_id) + ".instance"
+            chat_ref.document(str(chat_id)).update({key_string : str(self)})
         

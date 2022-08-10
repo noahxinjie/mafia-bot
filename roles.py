@@ -9,21 +9,21 @@ from player import Player
 
 class Role:
     @staticmethod
-    def json_to_dict(x) -> dict:
-        x = x.replace("\'", "\"")
-        x = x.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
-        x = x.replace('"is_bot": True', '"is_bot": "True"')
-        return json.loads(x)
+    def json_to_dict(json_input) -> dict:
+        json_input = json_input.replace("\'", "\"")
+        json_input = json_input.replace('"is_bot": False', '"is_bot": "False"') # replace boolean in json with string
+        json_input = json_input.replace('"is_bot": True', '"is_bot": "True"')
+        return json.loads(json_input)
 
     @staticmethod
     def button_change(time: int, reply_markup, msg: Message) -> None : 
         token = "5517840013:AAE41tDz97NjTHmT5b_2_pZNyzfF073yEoY"
         updater = Updater(token, use_context=True)
-        job = updater.job_queue
+        jobqueue = updater.job_queue
         def change(context: telegram.ext.CallbackContext) -> None :
             msg.edit_reply_markup(reply_markup=reply_markup)
-        job.run_once(callback=change, when=time, context=None, name=None, job_kwargs=None)
-        job.start()
+        jobqueue.run_once(callback=change, when=time, context=None, name=None, job_kwargs=None)
+        jobqueue.start()
 
     @staticmethod
     def build_menu(buttons,n_cols,header_buttons=None,footer_buttons=None):

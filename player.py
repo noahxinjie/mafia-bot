@@ -57,20 +57,19 @@ class Player:
 
     #number == 1 for finding highest and 2 for finding lowest
     def find_lowest_or_highest_winrate(self, number: int) -> int :
-      dict1 = self.stats["roles_percentage"]
-      list1 = []
-      for k, v in dict1.items() :
-        list1.append(v[2])
+      winrate_dict = self.stats["roles_percentage"]
+      winrate_list = []
+      for k, v in winrate_dict.items() :
+        winrate_list.append(v[2])
       if number == 1 :
-        value = max(list1)
+        value = max(winrate_list)
       else :
-        value = min(list1)
-      items = [*dict1.items()]
+        value = min(winrate_list)
+      items = [*winrate_dict.items()]
       random.shuffle(items)
       for k, v in items :
         if v[2] == value :
-          a = [int(s) for s in k.split() if s.isdigit()]
-          return a[0]
+          return [int(s) for s in k.split() if s.isdigit()][0]
 
     roles_dict = {1:'Mayor', 2:'Escort', 3:'Transporter', 4:'Retributionist', 5:'Vigilante', 6:'Veteran', 7:'Bodyguard', 8:'Doctor',
     9:'Investigator', 10:'Sheriff', 11:'Lookout', 12:'Godfather', 13:'Mafioso', 14:'Consort', 15:'Consigliere', 
